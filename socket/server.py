@@ -2,53 +2,22 @@ import concurrent.futures
 import tcp_socket as socket
 import threading
 import json
+from connection import Connection, ConnectionType
 
-
-class Server:
+class Server(Connection):
 
     def __init__(self, ip_addres, port):
-        self.continue_receive = True
-        self.lock = threading.Lock()
+        super().__init__(ip_addres, port, ConnectionType.Server)
         self.sender_nickname = "Server"
+        self.messages_lock = threading.Lock()
         self.received_messages = []
-        self.tcp_server = socket.create_server_connection(ip_addres, port)
-        self.receiver_nickname = socket.receive_nickname(self.tcp_server)
-        socket.send_nickname(self.tcp_server, self.sender_nickname)
+        self.receiver_nickname = socket.receive_nickname(self.socket)
+        socket.send_nickname(self.socket, self.sender_nickname)
 
 
-    def __enter__(self):
-        return self
-
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        print("server socket closed")
-        self.tcp_server.close()
-
-
-    def send(self):
-        while True:
-            lines = input()
-            if lines == "q":
-                with self.lock:
-                    self.continue_receive = False
-                print("stop sending")
-                return;
-            self.tcp_server.send(lines.encode())
-
-
-    def receive(self):
-        buffer_size = 1024
-
-        while self.continue_receive:
-            data = self.tcp_server.recv(buffer_size)
-            if not data:
-                continue
-            self.update_json_messages(data.decode())
-
-
-    def update_json_messages(self, message):
-        with self.lock:
-            self.received_messages.append(message)
+    def update_json_messages(self, decoded_message):
+        with self.messages_lock:
+            self.received_messages.append(decoded_message)
 
         with open(f'{self.sender_nickname}_messages.json', 'w') as json_file:
             json_file.seek(0)
@@ -58,8 +27,8 @@ class Server:
 
     def run(self):
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            executor.submit(self.send)
-            executor.submit(self.receive)
+            executor.submit(super().send)
+            executor.submit(super().receive, self.update_json_messages)
 
 
 with Server(ip_addres='', port=8080) as server:

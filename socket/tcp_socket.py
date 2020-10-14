@@ -13,6 +13,7 @@ def create_server_connection(ip_addres, port):
 
 def create_client_connection(ip_addres, port):
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client.settimeout(5)
     client.connect((ip_addres, port))
     client.setblocking(False)
     return client
